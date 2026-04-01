@@ -203,10 +203,6 @@ export async function POST() {
 
       // Main room
       rooms.push({ sourceId, platform, customerName: name, staffName: staff });
-      // Extra rooms
-      for (const ep of extraPlatforms) {
-        rooms.push({ sourceId: ep.sourceId, platform: ep.platform, customerName: name, staffName: staff });
-      }
     }
 
     if (customerDocs.length > 0) {

@@ -19,7 +19,11 @@
       "Bash(powershell -Command \"Get-ScheduledTask | Where-Object { $_.TaskName -like ''*Copilot*'' -or $_.TaskName -like ''*M365*'' } | Format-Table TaskName,State -AutoSize\")",
       "Bash(powershell -Command \"Get-AppxPackage *copilot* | Format-Table Name,Status -AutoSize\")",
       "Bash(grep -l \"export default\" /d/code/smltrack/smltrackdashboard/src/app/*/page.tsx)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(gh auth:*)"
     ]
   }
 }
