@@ -40,8 +40,6 @@ export async function POST(request: NextRequest) {
     }
     const mergedPlatformIds = {
       line: [...new Set([...toIdArray(primary.platformIds?.line), ...toIdArray(secondary.platformIds?.line), ...toIdArray(primary.lineId), ...toIdArray(secondary.lineId)])],
-      facebook: [...new Set([...toIdArray(primary.platformIds?.facebook), ...toIdArray(secondary.platformIds?.facebook), ...toIdArray(primary.facebookId), ...toIdArray(secondary.facebookId)])],
-      instagram: [...new Set([...toIdArray(primary.platformIds?.instagram), ...toIdArray(secondary.platformIds?.instagram), ...toIdArray(primary.instagramId), ...toIdArray(secondary.instagramId)])],
     };
 
     // รวม totalMessages
@@ -59,8 +57,6 @@ export async function POST(request: NextRequest) {
           customTags: mergedCustomTags,
           platformIds: mergedPlatformIds,
           lineId: mergedPlatformIds.line[0] || "",
-          facebookId: mergedPlatformIds.facebook[0] || "",
-          instagramId: mergedPlatformIds.instagram[0] || "",
           totalMessages: mergedMessages,
           // เติมข้อมูลที่ primary ไม่มี
           firstName: fillFrom("firstName"),

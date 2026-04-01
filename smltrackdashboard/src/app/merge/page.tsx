@@ -12,7 +12,7 @@ interface Customer {
   phone?: string;
   email?: string;
   rooms?: string[];
-  platformIds?: { line?: string | string[]; facebook?: string | string[]; instagram?: string | string[] };
+  platformIds?: { line?: string | string[] };
   totalMessages?: number;
   avatarUrl?: string;
   updatedAt?: string;
@@ -34,12 +34,8 @@ function platformBadges(c: Customer) {
   const pids = c.platformIds || {};
   const rooms = c.rooms || [];
   const badges = [];
-  if (hasIds(pids.line) || rooms.some(r => !r.startsWith("fb_") && !r.startsWith("ig_")))
+  if (hasIds(pids.line) || rooms.length > 0)
     badges.push({ label: "LINE", color: "bg-green-600" });
-  if (hasIds(pids.facebook) || rooms.some(r => r.startsWith("fb_")))
-    badges.push({ label: "FB", color: "bg-blue-600" });
-  if (hasIds(pids.instagram) || rooms.some(r => r.startsWith("ig_")))
-    badges.push({ label: "IG", color: "bg-pink-600" });
   return badges;
 }
 

@@ -6,9 +6,12 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN npm run build && \
+    cp -r .next/static .next/standalone/.next/static && \
+    cp -r public .next/standalone/public 2>/dev/null || true
 
 EXPOSE 3001
 
 ENV PORT=3001
-CMD ["npm", "start"]
+ENV HOSTNAME=0.0.0.0
+CMD ["node", ".next/standalone/server.js"]

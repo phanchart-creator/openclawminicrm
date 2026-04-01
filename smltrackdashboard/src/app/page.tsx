@@ -337,8 +337,6 @@ export default function Home() {
         {([
           { value: "all", label: "ทั้งหมด", badgeClass: "theme-bg-card theme-text-secondary hover:theme-bg-hover", activeClass: "bg-white text-black" },
           { value: "line", label: "LINE", badgeClass: "bg-green-900/40 text-green-400 hover:bg-green-800/50 border border-green-800/50", activeClass: "bg-green-600 text-white border border-green-500" },
-          { value: "facebook", label: "Facebook", badgeClass: "bg-blue-900/40 text-blue-400 hover:bg-blue-800/50 border border-blue-800/50", activeClass: "bg-blue-600 text-white border border-blue-500" },
-          { value: "instagram", label: "Instagram", badgeClass: "bg-pink-900/40 text-pink-400 hover:bg-pink-800/50 border border-pink-800/50", activeClass: "bg-gradient-to-r from-purple-600 to-pink-600 text-white border border-pink-500" },
         ]).map(({ value, label, badgeClass, activeClass }) => {
           const isActive = platformFilter === value;
           // Count per platform (from API, not client-side)

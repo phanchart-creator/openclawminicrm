@@ -130,12 +130,10 @@ function randomDate(daysBack: number) {
   return new Date(now - Math.random() * daysBack * 86400000);
 }
 
-function generateSourceId(platform: string) {
+function generateSourceId(_platform: string) {
   const chars = "abcdef0123456789";
   const id = Array.from({ length: 16 }, () => chars[randInt(0, 15)]).join("");
-  if (platform === "line") return (Math.random() > 0.3 ? "U" : "C") + id;
-  if (platform === "facebook") return "fb_" + id;
-  return "ig_" + id;
+  return (Math.random() > 0.3 ? "U" : "C") + id;
 }
 
 export async function POST() {
@@ -157,7 +155,7 @@ export async function POST() {
 
     // ─── 2. Generate customers + rooms ───
     const NUM_CUSTOMERS = 200;
-    const platforms = ["line", "line", "facebook", "facebook", "instagram", "instagram"]; // balanced
+    const platforms = ["line"];
     const pipelineStages = ["new", "new", "interested", "interested", "interested", "quoting", "quoting", "negotiating", "negotiating", "closed_won", "closed_won", "closed_lost", "closed_lost", "closed_lost", "following_up", "following_up"];
 
     interface RoomDef { sourceId: string; platform: string; customerName: string; staffName: string; isGroup?: boolean; members?: string[]; }
@@ -172,24 +170,8 @@ export async function POST() {
       const sourceId = generateSourceId(platform);
       const staff = rand(STAFF_NAMES);
 
-      // Many customers have multiple platforms (40% 2 platforms, 15% 3 platforms)
-      const extraPlatforms: { platform: string; sourceId: string }[] = [];
-      if (Math.random() > 0.5) {
-        const p2 = platform === "line" ? (Math.random() > 0.5 ? "facebook" : "instagram")
-          : platform === "facebook" ? (Math.random() > 0.5 ? "line" : "instagram")
-          : (Math.random() > 0.5 ? "line" : "facebook");
-        extraPlatforms.push({ platform: p2, sourceId: generateSourceId(p2) });
-      }
-      if (Math.random() > 0.75) {
-        const existing = [platform, ...extraPlatforms.map(e => e.platform)];
-        const p3 = ["line", "facebook", "instagram"].find(p => !existing.includes(p));
-        if (p3) extraPlatforms.push({ platform: p3, sourceId: generateSourceId(p3) });
-      }
-
-      const allRooms = [sourceId, ...extraPlatforms.map(e => e.sourceId)];
-      const platformIds: Record<string, string[]> = { line: [], facebook: [], instagram: [] };
-      platformIds[platform].push(sourceId);
-      for (const ep of extraPlatforms) platformIds[ep.platform].push(ep.sourceId);
+      const allRooms = [sourceId];
+      const platformIds: Record<string, string[]> = { line: [sourceId] };
 
       const stage = rand(pipelineStages);
       const dealValue = ["quoting", "negotiating", "closed_won"].includes(stage) ? randPrice() * randInt(1, 5) : 0;
@@ -205,8 +187,6 @@ export async function POST() {
         sourceId,
         platformIds,
         lineId: platformIds.line[0] || "",
-        facebookId: platformIds.facebook[0] || "",
-        instagramId: platformIds.instagram[0] || "",
         rooms: allRooms,
         tags: [],
         customTags: [],
@@ -268,7 +248,7 @@ export async function POST() {
 
     const NUM_GROUPS = 25;
     for (let g = 0; g < NUM_GROUPS; g++) {
-      const platform = rand(["line", "line", "facebook"]); // groups mostly LINE
+      const platform = "line";
       const sourceId = "C" + Array.from({ length: 16 }, () => "abcdef0123456789"[randInt(0, 15)]).join("");
       const staff = rand(STAFF_NAMES);
       const memberCount = randInt(3, 8);
@@ -775,24 +755,6 @@ export async function POST() {
         aiReplyKeywords: [],
       },
       {
-        sourceId: rooms[5]?.sourceId || "fb_0003",
-        sourceType: "user",
-        groupName: "คุณวิภา — Facebook",
-        botName: "น้องกุ้ง FB",
-        systemPrompt: "ตอบเฉพาะเรื่องสินค้าและราคา ถ้าถามเรื่องอื่นให้บอกว่า รอพนักงานตอบนะครับ ห้ามตอบเรื่องการเมือง ศาสนา",
-        aiReplyMode: "keyword",
-        aiReplyKeywords: ["ราคา", "เท่าไหร่", "สต็อก", "มีของ", "สั่ง"],
-      },
-      {
-        sourceId: rooms[10]?.sourceId || "ig_0004",
-        sourceType: "user",
-        groupName: "คุณณัฐ — Instagram",
-        botName: "น้องกุ้ง IG",
-        systemPrompt: "ตอบสั้น กระชับ ใช้ emoji เยอะ เหมาะกับ Instagram ถ้าลูกค้าสนใจให้ส่งลิงก์ catalog",
-        aiReplyMode: "mention",
-        aiReplyKeywords: [],
-      },
-      {
         sourceId: rooms.find(r => r.isGroup)?.sourceId || "C0005",
         sourceType: "group",
         groupName: "กลุ่มผู้รับเหมา VIP",
@@ -811,7 +773,7 @@ export async function POST() {
         aiReplyKeywords: [],
       },
       {
-        sourceId: rooms[20]?.sourceId || "fb_0007",
+        sourceId: rooms[20]?.sourceId || "U0007",
         sourceType: "user",
         groupName: "คุณเฉลิม — ต่อเติมบ้าน",
         botName: "ที่ปรึกษาก่อสร้าง",
@@ -838,9 +800,9 @@ export async function POST() {
         aiReplyKeywords: ["ราคา", "ปูน", "สต็อก", "เท่าไหร่", "กี่ถุง", "โปร", "ส่ง"],
       },
       {
-        sourceId: rooms[30]?.sourceId || "ig_0010",
+        sourceId: rooms[30]?.sourceId || "U0010",
         sourceType: "user",
-        groupName: "คุณมาลี — Instagram DM",
+        groupName: "คุณมาลี — LINE",
         botName: "น้องกุ้ง",
         systemPrompt: "ตอบทุกข้อความ แต่ถ้าลูกค้าถามเรื่องราคาส่งหรือเครดิต ให้บอกว่าต้องคุยกับฝ่ายขายโดยตรง พร้อมส่งเบอร์โทร 081-234-5678",
         aiReplyMode: "auto",
@@ -981,7 +943,7 @@ export async function POST() {
         messages: [
           { dayOffset: 0, template: "สวัสดีค่ะ {{name}} 😊 สนใจสินค้าตัวไหนบอกได้เลยนะคะ ตอบทุกคำถามค่ะ" },
         ],
-        aiGenerate: false, platform: "facebook",
+        aiGenerate: false, platform: "line",
         status: "active",
         stats: { triggered: 30, replied: 12, converted: 3 },
       },
@@ -1020,7 +982,7 @@ export async function POST() {
         customerId: c.sourceId,
         customerName: c.name,
         sourceId: c.rooms?.[0] || c.sourceId,
-        platform: c.rooms?.[0]?.startsWith("fb_") ? "facebook" : c.rooms?.[0]?.startsWith("ig_") ? "instagram" : "line",
+        platform: "line",
         currentStep: st === "pending" ? 0 : 1,
         totalSteps: 2,
         status: st,

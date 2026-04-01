@@ -61,9 +61,7 @@ interface ReplyTemplate {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const PLATFORM_CONFIG: Record<string, { label: string; color: string; badgeBg: string; dot: string }> = {
-  line:      { label: "LINE",      color: "text-green-400",  badgeBg: "bg-green-600",  dot: "bg-green-400" },
-  facebook:  { label: "Facebook",  color: "text-blue-400",   badgeBg: "bg-blue-600",   dot: "bg-blue-400" },
-  instagram: { label: "Instagram", color: "text-pink-400",   badgeBg: "bg-gradient-to-r from-purple-600 to-pink-600", dot: "bg-pink-400" },
+  line: { label: "LINE", color: "text-green-400", badgeBg: "bg-green-600", dot: "bg-green-400" },
 };
 
 const SENTIMENT_LABELS: Record<string, string> = {
@@ -109,13 +107,11 @@ function platformBadge(platform: string) {
 
 function getInitials(name: string): string {
   if (!name) return "?";
-  const clean = name.replace(/^(fb_|ig_)/, "").toUpperCase();
+  const clean = name.toUpperCase();
   return clean.substring(0, 2);
 }
 
-function avatarBg(platform: string): string {
-  if (platform === "facebook") return "bg-blue-600";
-  if (platform === "instagram") return "bg-pink-600";
+function avatarBg(_platform: string): string {
   return "bg-green-600";
 }
 
@@ -469,8 +465,6 @@ export default function InboxPage() {
   const platformCounts = {
     all: conversations.length,
     line: conversations.filter((c) => (c.platform || "line") === "line").length,
-    facebook: conversations.filter((c) => c.platform === "facebook").length,
-    instagram: conversations.filter((c) => c.platform === "instagram").length,
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -520,20 +514,16 @@ export default function InboxPage() {
 
         {/* Platform Filter Tabs */}
         <div className="px-3 py-2 border-b theme-border flex gap-1 flex-wrap">
-          {(["all", "line", "facebook", "instagram"] as const).map((p) => {
+          {(["all", "line"] as const).map((p) => {
             const isActive = platformFilter === p;
-            const labels: Record<string, string> = { all: "ทั้งหมด", line: "LINE", facebook: "FB", instagram: "IG" };
+            const labels: Record<string, string> = { all: "ทั้งหมด", line: "LINE" };
             const activeColors: Record<string, string> = {
               all: "bg-white text-black",
               line: "bg-green-600 text-white",
-              facebook: "bg-blue-600 text-white",
-              instagram: "bg-gradient-to-r from-purple-600 to-pink-600 text-white",
             };
             const inactiveColors: Record<string, string> = {
               all: "theme-bg-card theme-text-secondary",
               line: "bg-green-900/30 text-green-400",
-              facebook: "bg-blue-900/30 text-blue-400",
-              instagram: "bg-pink-900/30 text-pink-400",
             };
             return (
               <button

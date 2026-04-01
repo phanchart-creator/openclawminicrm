@@ -2,7 +2,7 @@
 
 ## Architecture
 ```
-LINE / Facebook / Instagram
+LINE OA
   ↓ webhook
 Nginx (SSL + rate limit)
   ↓
@@ -17,13 +17,13 @@ Dashboard (Docker) → Google Login → แสดงสนทนา + CRM + KPI 
 
 ## Brand
 - **ชื่อ:** OpenClaw Mini CRM
-- **Tagline:** AI Chat Intelligence — LINE · Facebook · Instagram
+- **Tagline:** AI Chat Intelligence — LINE OA
 - **Domain:** crm.satistang.com (production) / smlclaw.satistang.com (legacy)
 - **Deploy:** Hetzner VPS + Docker Compose
 
 ## Core Principle — OpenClaw เป็นแกนหลัก
-- **OpenClaw** = สมองกลาง (AI Advisor) — gateway + cron + multi-channel
-- **Agent** = หูและปาก (LINE/FB/IG webhook + RAG + AI reply + MCP)
+- **OpenClaw** = สมองกลาง (AI Advisor) — gateway + cron
+- **Agent** = หูและปาก (LINE webhook + RAG + AI reply + MCP)
 - **Dashboard** = ตา (แสดงข้อมูลจาก MongoDB + Google Login + multi-tenant)
 
 ## Services
@@ -31,20 +31,18 @@ Dashboard (Docker) → Google Login → แสดงสนทนา + CRM + KPI 
 |---------|------|------|--------|
 | **Nginx** | Reverse proxy + SSL | 80/443 | `nginx/` |
 | **OpenClaw** | AI Advisor (แกนหลัก) | 18789 | `openclaw/` |
-| **Agent** | LINE/FB/IG + RAG + MCP | 3000 | `proxy/` |
+| **Agent** | LINE + RAG + MCP | 3000 | `proxy/` |
 | **Dashboard** | Web UI + Auth | 3001 | `smltrackdashboard/` |
 
 ## URLs
 - **Production:** `https://crm.satistang.com/dashboard`
 - **LINE webhook:** `https://crm.satistang.com/webhook`
-- **Meta webhook:** `https://crm.satistang.com/webhook/meta`
 - **OpenClaw:** `http://localhost:18789` (internal)
 
-## Multi-Platform (LINE + Facebook + Instagram)
-- **messages.platform:** `"line"` | `"facebook"` | `"instagram"`
-- **sourceId format:** LINE=`Cxxx`/`Uxxx`, Facebook=`fb_xxx`, Instagram=`ig_xxx`
-- **Dashboard:** tab filter แยกแต่ละ platform
-- **Webhook:** `/webhook` (LINE), `/webhook/meta` (FB+IG — shared Meta API)
+## Platform — LINE OA เท่านั้น
+- **messages.platform:** `"line"` เท่านั้น
+- **sourceId format:** `Cxxx` (group), `Uxxx` (user)
+- **Webhook:** `/webhook` (LINE Reply API)
 
 ## Authentication (Google OAuth)
 - **NextAuth** + Google Provider
@@ -85,7 +83,6 @@ groups_meta     { sourceId, groupName, platform, teamId }
 ## Env vars (.env)
 - `MONGODB_URI` — MongoDB Atlas
 - `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`
-- `FB_PAGE_ACCESS_TOKEN`, `FB_APP_SECRET`, `FB_VERIFY_TOKEN`
 - `SAMBANOVA_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `OPENROUTER_API_KEY`, `GOOGLE_API_KEY`
 - `MCP_ERP_API_KEY` — bc-erp MCP auth
 - `OPENCLAW_GATEWAY_TOKEN` — OpenClaw gateway
@@ -104,6 +101,7 @@ groups_meta     { sourceId, groupName, platform, teamId }
 - ห้ามแยก MongoDB collection ตามคน/กลุ่ม
 - ห้ามลบ OpenClaw — เป็นแกนหลักของระบบ
 - ห้าม hardcode สี Tailwind ในหน้าใหม่ — ใช้ theme-* classes
+- **ห้ามเพิ่ม Facebook/Instagram กลับเข้ามา** — ระบบนี้ใช้ LINE OA เท่านั้น (ตัดสินใจ 2026-04-01)
 
 ## Skills
 | Skill | File | หน้าที่ |

@@ -61,25 +61,6 @@ const SECTIONS: Section[] = [
 9. ทดสอบ: ส่งข้อความใน LINE OA → ดูใน Dashboard ถ้าขึ้นแสดงว่าสำเร็จ`,
       },
       {
-        title: "4. เชื่อม Facebook + Instagram",
-        content: `Facebook:
-1. ไปที่ developers.facebook.com → สร้าง App (Business type)
-2. เพิ่ม Product "Messenger" → ตั้งค่า Webhook
-3. Webhook URL: https://crm.satistang.com/webhook/meta
-4. Verify Token: ใส่ค่าเดียวกับ FB_VERIFY_TOKEN ใน .env
-5. Subscribe: messages, messaging_postbacks
-6. คัดลอก Page Access Token → ใส่ใน .env ที่ FB_PAGE_ACCESS_TOKEN=
-
-Instagram:
-1. Facebook Page ต้องเชื่อมกับ Instagram Business/Creator Account
-2. ไปที่ Facebook Page Settings → Instagram → Connect Account
-3. ไปที่ App Dashboard → Messenger → Instagram
-4. Subscribe: messages
-5. Instagram จะใช้ Webhook เดียวกับ Facebook (/webhook/meta)
-
-ทดสอบ: ส่งข้อความใน Facebook Messenger หรือ Instagram DM → ดูใน Dashboard`,
-      },
-      {
         title: "5. เชื่อม Telegram",
         content: `สำหรับรับ AI Advice ส่วนตัวจาก "น้องกุ้ง":
 
@@ -949,7 +930,7 @@ Dashboard (Next.js 16) → Auth → CRM + KPI + Analytics`,
 • Caddy Server — Reverse Proxy, Auto HTTPS (Let's Encrypt)
 • Docker Compose — Container Orchestration
 • AI Multi-Provider — OpenRouter, Groq, SambaNova, Cerebras, Gemini
-• LINE/Meta API — Webhook + Messaging
+• LINE API — Webhook + Messaging
 • SSE (Server-Sent Events) — Real-time Notifications`,
       },
       {

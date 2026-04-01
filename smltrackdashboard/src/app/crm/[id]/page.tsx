@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 
 interface PlatformIds {
   line?: string | string[];
-  facebook?: string | string[];
-  instagram?: string | string[];
 }
 
 // Normalize platformIds — รองรับทั้ง string เดิม และ array ใหม่
@@ -27,8 +25,6 @@ interface Customer {
   phone?: string;
   email?: string;
   lineId?: string;
-  facebookId?: string;
-  instagramId?: string;
   platformIds?: PlatformIds;
   address?: string;
   notes?: string;
@@ -90,8 +86,6 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [lineIds, setLineIds] = useState<string[]>([]);
-  const [facebookIds, setFacebookIds] = useState<string[]>([]);
-  const [instagramIds, setInstagramIds] = useState<string[]>([]);
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -129,8 +123,6 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           setPhone(d.phone || "");
           setEmail(d.email || "");
           setLineIds(toIdArray(d.platformIds?.line).length > 0 ? toIdArray(d.platformIds?.line) : d.lineId ? [d.lineId] : []);
-          setFacebookIds(toIdArray(d.platformIds?.facebook).length > 0 ? toIdArray(d.platformIds?.facebook) : d.facebookId ? [d.facebookId] : []);
-          setInstagramIds(toIdArray(d.platformIds?.instagram).length > 0 ? toIdArray(d.platformIds?.instagram) : d.instagramId ? [d.instagramId] : []);
           setAddress(d.address || "");
           setNotes(d.notes || "");
           setAvatarUrl(d.avatarUrl || "");
@@ -155,8 +147,6 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         phone, email, address, notes, avatarUrl,
         platformIds: {
           line: lineIds.filter(Boolean),
-          facebook: facebookIds.filter(Boolean),
-          instagram: instagramIds.filter(Boolean),
         },
         customTags: customTags.split(",").map((t) => t.trim()).filter(Boolean),
         dealValue: dealValue !== "" ? parseFloat(dealValue) : undefined,
@@ -494,54 +484,14 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                     className="text-[11px] text-green-400 hover:text-green-300 px-1">+ เพิ่ม LINE ID</button>
                 </div>
               </div>
-              {/* Facebook */}
-              <div>
-                <label className="block text-[11px] theme-text-muted mb-1">
-                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> Facebook ({facebookIds.length})</span>
-                </label>
-                <div className="space-y-1">
-                  {facebookIds.map((id, i) => (
-                    <div key={i} className="flex gap-1">
-                      <input type="text" value={id}
-                        onChange={(e) => { const arr = [...facebookIds]; arr[i] = e.target.value; setFacebookIds(arr); }}
-                        placeholder="fb_xxxxxxxxxx"
-                        className="flex-1 px-3 py-1.5 rounded-lg border theme-border text-sm theme-bg theme-text font-mono text-xs" style={{ background: "var(--bg-primary)" }} />
-                      <button onClick={() => setFacebookIds(facebookIds.filter((_, j) => j !== i))}
-                        className="px-2 text-red-400 hover:text-red-300 text-sm">✕</button>
-                    </div>
-                  ))}
-                  <button onClick={() => setFacebookIds([...facebookIds, ""])}
-                    className="text-[11px] text-blue-400 hover:text-blue-300 px-1">+ เพิ่ม Facebook ID</button>
-                </div>
-              </div>
-              {/* Instagram */}
-              <div>
-                <label className="block text-[11px] theme-text-muted mb-1">
-                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 inline-block" /> Instagram ({instagramIds.length})</span>
-                </label>
-                <div className="space-y-1">
-                  {instagramIds.map((id, i) => (
-                    <div key={i} className="flex gap-1">
-                      <input type="text" value={id}
-                        onChange={(e) => { const arr = [...instagramIds]; arr[i] = e.target.value; setInstagramIds(arr); }}
-                        placeholder="ig_xxxxxxxxxx"
-                        className="flex-1 px-3 py-1.5 rounded-lg border theme-border text-sm theme-bg theme-text font-mono text-xs" style={{ background: "var(--bg-primary)" }} />
-                      <button onClick={() => setInstagramIds(instagramIds.filter((_, j) => j !== i))}
-                        className="px-2 text-red-400 hover:text-red-300 text-sm">✕</button>
-                    </div>
-                  ))}
-                  <button onClick={() => setInstagramIds([...instagramIds, ""])}
-                    className="text-[11px] text-pink-400 hover:text-pink-300 px-1">+ เพิ่ม Instagram ID</button>
-                </div>
-              </div>
             </div>
             {(customer.rooms || []).length > 0 && (
               <div className="mt-3">
                 <p className="text-[10px] theme-text-muted mb-1">ห้องสนทนาที่เชื่อมอยู่ ({customer.rooms.length})</p>
                 <div className="flex flex-wrap gap-1">
                   {customer.rooms.map((r) => {
-                    const pl = r.startsWith("fb_") ? "FB" : r.startsWith("ig_") ? "IG" : "LINE";
-                    const plColor = pl === "FB" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : pl === "IG" ? "bg-pink-500/10 text-pink-400 border-pink-500/20" : "bg-green-500/10 text-green-400 border-green-500/20";
+                    const pl = "LINE";
+                    const plColor = "bg-green-500/10 text-green-400 border-green-500/20";
                     return <span key={r} className={`text-[10px] px-2 py-0.5 rounded-lg border font-mono ${plColor}`}>{pl}: {r.substring(0, 16)}{r.length > 16 ? "..." : ""}</span>;
                   })}
                 </div>
@@ -644,8 +594,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                       <p className="text-sm font-medium truncate">{c.firstName ? `${c.firstName} ${c.lastName || ""}`.trim() : c.name}</p>
                       <div className="flex items-center gap-1">
                         {(c.rooms || []).map((r) => {
-                          const pl = r.startsWith("fb_") ? "FB" : r.startsWith("ig_") ? "IG" : "LINE";
-                          const color = pl === "FB" ? "bg-blue-500" : pl === "IG" ? "bg-pink-500" : "bg-green-500";
+                          const pl = "LINE";
+                          const color = "bg-green-500";
                           return <span key={r} className={`w-2 h-2 rounded-full ${color}`} title={`${pl}: ${r}`} />;
                         })}
                         <span className="text-[10px] theme-text-muted ml-1">{c.totalMessages} msg</span>

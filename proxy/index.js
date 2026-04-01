@@ -814,8 +814,6 @@ async function ensureIndexes() {
     await custColl.createIndex({ name: 1 });                     // upsert by name
     await custColl.createIndex({ rooms: 1 });                    // ค้นหาจาก sourceId
     await custColl.createIndex({ "platformIds.line": 1 }, { sparse: true });
-    await custColl.createIndex({ "platformIds.facebook": 1 }, { sparse: true });
-    await custColl.createIndex({ "platformIds.instagram": 1 }, { sparse: true });
     await custColl.createIndex({ phone: 1 }, { sparse: true }); // ค้นหาเบอร์โทร
     await custColl.createIndex({ email: 1 }, { sparse: true }); // ค้นหา email
     await custColl.createIndex({ pipelineStage: 1, updatedAt: -1 }); // CRM pipeline
@@ -1902,44 +1900,6 @@ async function aiReplyToLine(event, sourceId, userName, text, config) {
   }
 }
 
-// === น้องกุ้งตอบแทนใน Facebook/Instagram (Send API — ฟรี!) ===
-async function aiReplyToMeta(senderId, text, sourceId, platform) {
-  const contextDocs = await searchMessages(sourceId, text).catch(() => []);
-  const contextStr = contextDocs.slice(0, 5)
-    .map((d) => `[${d.role === "assistant" ? "น้องกุ้ง" : d.userName || "User"}] ${d.content}`)
-    .join("\n");
-
-  // [A/B] Append A/B variant instruction
-  const variant = getABVariant(sourceId);
-  const abInstruction = AB_PROMPTS[variant];
-
-  const messages = [
-    { role: "system", content: `${DEFAULT_PROMPT}\n\nสไตล์การตอบ: ${abInstruction}\n\nประวัติสนทนา:\n${contextStr || "(ไม่มี)"}` },
-    { role: "user", content: cleanForAI(text) },
-  ];
-
-  const reply = await callLightAI(messages, { maxTokens: 300, timeout: 15000 }).catch(() => null);
-  if (!reply) return;
-
-  // AI บอก "รอทีมงาน" → สร้าง alert ให้ dashboard
-  if (/รอทีมงาน/.test(reply)) {
-    await createAiHandoffAlert(sourceId, senderId, text, platform);
-  }
-
-  const sent = await sendMetaMessage(senderId, reply);
-  if (sent) {
-    await saveMsg(sourceId, {
-      role: "assistant",
-      userName: "น้องกุ้ง",
-      content: reply,
-      messageType: "text",
-      isAiReply: true,
-      abVariant: variant,
-    }, platform);
-    console.log(`[AI-Reply] ✅ ${platform}: ${reply.substring(0, 50)}`);
-  }
-}
-
 // === Push message (fallback — รองรับ Quick Reply ด้วย) ===
 async function pushToLine(to, text, quickReplies) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -2128,29 +2088,19 @@ pipelineStage: new=ใหม่, interested=สนใจ, quoting=เสนอ�
         } catch {}
       }
 
-      // platformIds — เก็บ ID ของแต่ละ platform เป็น array (รองรับหลาย ID ต่อ platform)
+      // platformIds — เก็บ LINE ID เป็น array
       const addToSetOps = { tags: { $each: tags }, rooms: sourceId };
-      if (platform === "line" && lineUserId) {
+      if (lineUserId) {
         addToSetOps["platformIds.line"] = lineUserId;
-      } else if (platform === "facebook" && userId) {
-        addToSetOps["platformIds.facebook"] = userId;
-      } else if (platform === "instagram" && userId) {
-        addToSetOps["platformIds.instagram"] = userId;
       }
 
-      // ตรวจว่า platformIds เดิมเป็น string หรือ array — ถ้าเป็น string ต้อง convert ก่อน
+      // ตรวจว่า platformIds.line เดิมเป็น string หรือ array — ถ้าเป็น string ต้อง convert ก่อน
       const existingCust = await database.collection("customers").findOne({ name: userName });
-      if (existingCust?.platformIds) {
-        const pids = existingCust.platformIds;
-        for (const k of ["line", "facebook", "instagram"]) {
-          if (pids[k] && !Array.isArray(pids[k])) {
-            // Convert string → array ก่อน addToSet
-            await database.collection("customers").updateOne(
-              { name: userName },
-              { $set: { [`platformIds.${k}`]: [pids[k]] } }
-            );
-          }
-        }
+      if (existingCust?.platformIds?.line && !Array.isArray(existingCust.platformIds.line)) {
+        await database.collection("customers").updateOne(
+          { name: userName },
+          { $set: { "platformIds.line": [existingCust.platformIds.line] } }
+        );
       }
 
       await database.collection("customers").updateOne(
@@ -2166,7 +2116,7 @@ pipelineStage: new=ใหม่, interested=สนใจ, quoting=เสนอ�
           },
           $addToSet: addToSetOps,
           $inc: { totalMessages: 1 },
-          $setOnInsert: { createdAt: new Date(), firstName: "", lastName: "", company: "", position: "", phone: "", email: "", address: "", notes: "", customTags: [], platformIds: { line: [], facebook: [], instagram: [] } },
+          $setOnInsert: { createdAt: new Date(), firstName: "", lastName: "", company: "", position: "", phone: "", email: "", address: "", notes: "", customTags: [], platformIds: { line: [] } },
         },
         { upsert: true }
       );
@@ -2331,314 +2281,6 @@ async function analyzeImage(imageBuffer) {
 
   return null;
 }
-
-// === Meta (Facebook/Instagram) helpers ===
-
-// Verify X-Hub-Signature-256
-function verifyMetaSignature(rawBody, signature) {
-  if (!signature) return false;
-  const hmac = require("crypto").createHmac("sha256", process.env.FB_APP_SECRET || "")
-  const digest = "sha256=" + hmac.update(rawBody).digest("hex")
-  return digest === signature
-}
-
-// Cache โปรไฟล์ผู้ใช้ Meta (ไม่เรียก Graph API ซ้ำ)
-const metaProfileCache = {} // userId → { name, profilePic, _ts }
-const META_PROFILE_TTL = 3600000 // 1 ชม.
-
-async function getMetaUserProfile(userId) {
-  const cached = metaProfileCache[userId]
-  if (cached && Date.now() - cached._ts < META_PROFILE_TTL) return cached
-
-  const token = process.env.FB_PAGE_ACCESS_TOKEN
-  if (!token) return { name: userId, profilePic: null }
-
-  try {
-    const res = await fetch(
-      `https://graph.facebook.com/v19.0/${userId}?fields=name,profile_pic&access_token=${token}`,
-      { signal: AbortSignal.timeout(5000) }
-    )
-    if (!res.ok) return { name: userId, profilePic: null }
-    const data = await res.json()
-    const profile = { name: data.name || userId, profilePic: data.profile_pic || null, _ts: Date.now() }
-    metaProfileCache[userId] = profile
-    return profile
-  } catch (e) {
-    return { name: userId, profilePic: null }
-  }
-}
-
-// ส่งข้อความกลับ Meta (สำรองไว้ — ระบบนี้ listen-only, ยังไม่เรียก)
-async function sendMetaMessage(recipientId, text) {
-  const token = process.env.FB_PAGE_ACCESS_TOKEN
-  if (!token) return false
-  try {
-    const res = await fetch("https://graph.facebook.com/v19.0/me/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        message: { text },
-      }),
-    })
-    return res.ok
-  } catch (e) {
-    console.error("[Meta] sendMetaMessage error:", e.message)
-    return false
-  }
-}
-
-// === Meta Webhook: Verification (GET) ===
-app.get("/webhook/meta", (req, res) => {
-  const mode = req.query["hub.mode"]
-  const token = req.query["hub.verify_token"]
-  const challenge = req.query["hub.challenge"]
-
-  if (mode === "subscribe" && token === (process.env.FB_VERIFY_TOKEN || "")) {
-    console.log("[Meta] Webhook verified ✅")
-    return res.status(200).send(challenge)
-  }
-  console.log("[Meta] Webhook verification failed ❌")
-  return res.status(403).send("Forbidden")
-})
-
-// === Meta Webhook: Messages (POST) ===
-app.post("/webhook/meta", express.raw({ type: "*/*" }), async (req, res) => {
-  const rawBody = req.body
-  const signature = req.headers["x-hub-signature-256"]
-
-  // Verify signature
-  if (!verifyMetaSignature(rawBody, signature)) {
-    console.log("[Meta] Invalid signature ❌")
-    return res.status(403).json({ error: "Invalid signature" })
-  }
-
-  let parsed
-  try {
-    parsed = JSON.parse(rawBody.toString("utf-8"))
-  } catch {
-    return res.status(200).json({ status: "ok" })
-  }
-
-  // ตอบ Meta ทันที (ต้องตอบภายใน 20 วินาที)
-  res.status(200).json({ status: "ok" })
-
-  const object = parsed.object // "page" = Facebook, "instagram" = Instagram
-  const platform = object === "instagram" ? "instagram" : "facebook"
-
-  const entries = parsed.entry || []
-  for (const entry of entries) {
-    const messagingEvents = entry.messaging || []
-    for (const event of messagingEvents) {
-      const sender = event.sender
-      const recipient = event.recipient
-      if (!sender?.id) continue
-
-      // ข้ามข้อความที่ Bot ส่งเอง
-      if (event.message?.is_echo) continue
-
-      const senderId = sender.id
-      const sourceId = platform === "facebook" ? `fb_${senderId}` : `ig_${senderId}`
-
-      // ดึง user profile (cached)
-      const profile = await getMetaUserProfile(senderId).catch(() => ({ name: senderId, profilePic: null }))
-      const userName = profile.name
-
-      // Save group meta
-      saveGroupMeta(sourceId, userName, { type: "user" }, platform).catch(() => {})
-
-      // === Opt-out / Opt-in / PDPA / Human Handoff Detection (Meta) ===
-      const metaLowerText = (event.message?.text || "").toLowerCase().trim();
-
-      if (OPT_OUT_KEYWORDS.includes(metaLowerText)) {
-        await setOptOut(sourceId, true);
-        await sendMetaMessage(senderId, "✅ หยุดส่งข้อความอัตโนมัติแล้วค่ะ\nพิมพ์ \"เปิด\" เพื่อรับข้อความอีกครั้ง");
-        console.log(`[Opt-out] ${sourceId.substring(0, 12)} opted out (${platform})`);
-        continue;
-      }
-
-      if (OPT_IN_KEYWORDS.includes(metaLowerText)) {
-        await setOptOut(sourceId, false);
-        await sendMetaMessage(senderId, "✅ เปิดรับข้อความอัตโนมัติแล้วค่ะ");
-        console.log(`[Opt-in] ${sourceId.substring(0, 12)} opted in (${platform})`);
-        continue;
-      }
-
-      if (DELETE_KEYWORDS.includes(metaLowerText)) {
-        await sendMetaMessage(senderId, "📩 ได้รับคำขอลบข้อมูลแล้วค่ะ ทีมงานจะดำเนินการภายใน 30 วันตาม PDPA\n\nหากมีคำถามเพิ่มเติม สามารถติดต่อทีมงานได้ค่ะ");
-        await logDeletionRequest(sourceId, platform);
-        console.log(`[PDPA] ขอลบข้อมูล: ${sourceId.substring(0, 12)} (${platform})`);
-        continue;
-      }
-
-      if (HANDOFF_REGEX.test(metaLowerText)) {
-        await sendMetaMessage(senderId, "🙋 ส่งต่อให้ทีมงานแล้วค่ะ กรุณารอสักครู่ ทีมงานจะตอบกลับเร็วที่สุดค่ะ");
-        await createHandoffAlert(sourceId, userName, event.message?.text);
-        console.log(`[Handoff] ${sourceId.substring(0, 12)} ขอคุยกับพนักงาน (${platform})`);
-        if (event.message?.text) {
-          await saveMsg(sourceId, {
-            role: "user", userName, userId: senderId,
-            content: event.message.text, messageType: "text",
-            messageId: event.message.mid || null, timestamp: event.timestamp || null,
-            recipientId: recipient?.id || null,
-          }, platform);
-        }
-        continue;
-      }
-
-      // handle text message
-      if (event.message?.text) {
-        const msgText = event.message.text
-        const topic = detectMessageTopic(msgText)
-        await saveMsg(sourceId, {
-          role: "user",
-          userName,
-          userId: senderId,
-          content: msgText,
-          messageType: "text",
-          topic,
-          messageId: event.message.mid || null,
-          timestamp: event.timestamp || null,
-          recipientId: recipient?.id || null,
-        }, platform)
-
-        console.log(`[Meta/${platform}] ${userName}@${sourceId.substring(0, 12)}: ${msgText.substring(0, 60)}`)
-
-        // === [Privacy] แจ้ง PDPA ข้อความแรก (Meta) ===
-        sendPrivacyNoticeIfNeeded(sourceId, platform, () =>
-          sendMetaMessage(senderId, PRIVACY_TEXT)
-        ).catch(() => {})
-
-        analyzeChat(sourceId, userName, msgText, senderId, { type: "user" }).catch((e) => console.error("[Meta/Skill] Catch:", e.message))
-        learnFromMessage(sourceId, userName, msgText, "text", "user").catch(() => {})
-
-        // น้องกุ้งตอบแทนใน Facebook/Instagram (Send API — ฟรี!)
-        const metaIsOptedOut = await checkOptedOut(sourceId).catch(() => false);
-        if (!metaIsOptedOut) {
-          const metaConfig = await getBotConfig(sourceId)
-          const metaShouldReply = await shouldAiReply(metaConfig, msgText, userName, { type: "user" })
-          if (metaShouldReply) {
-            console.log(`[AI-Reply] น้องกุ้งตอบแทน → ${platform} ${sourceId.substring(0, 12)}`)
-            aiReplyToMeta(senderId, msgText, sourceId, platform).catch((e) =>
-              console.error(`[AI-Reply] ${platform} error:`, e.message)
-            )
-          }
-        }
-      }
-
-      // handle ALL attachment types (image, video, audio, file, location, sticker)
-      const attachments = event.message?.attachments || []
-      for (const att of attachments) {
-        const attUrl = att.payload?.url || null
-        const baseMsgFields = {
-          role: "user",
-          userName,
-          userId: senderId,
-          messageId: event.message?.mid || null,
-          timestamp: event.timestamp || null,
-          recipientId: recipient?.id || null,
-        }
-
-        if (att.type === "image") {
-          await saveMsg(sourceId, {
-            ...baseMsgFields,
-            content: `[รูปภาพ]`,
-            messageType: "image",
-            imageUrl: attUrl,
-            hasImage: true,
-          }, platform)
-          console.log(`[Meta/${platform}] ${userName}: [image]`)
-
-        } else if (att.type === "video") {
-          await saveMsg(sourceId, {
-            ...baseMsgFields,
-            content: "[วิดีโอ]",
-            messageType: "video",
-            videoUrl: attUrl,
-            hasVideo: true,
-          }, platform)
-          console.log(`[Meta/${platform}] ${userName}: [video]`)
-
-        } else if (att.type === "audio") {
-          await saveMsg(sourceId, {
-            ...baseMsgFields,
-            content: "[เสียง]",
-            messageType: "audio",
-            audioUrl: attUrl,
-            hasAudio: true,
-          }, platform)
-          console.log(`[Meta/${platform}] ${userName}: [audio]`)
-
-        } else if (att.type === "file") {
-          await saveMsg(sourceId, {
-            ...baseMsgFields,
-            content: `[ไฟล์: ${att.payload?.name || "unknown"}]`,
-            messageType: "file",
-            file: {
-              fileName: att.payload?.name || "file",
-              fileSize: att.payload?.size || null,
-              url: attUrl,
-            },
-            hasFile: true,
-          }, platform)
-          console.log(`[Meta/${platform}] ${userName}: [file]`)
-
-        } else if (att.type === "location") {
-          const coords = att.payload?.coordinates || {}
-          await saveMsg(sourceId, {
-            ...baseMsgFields,
-            content: `[ตำแหน่ง: ${coords.lat || 0}, ${coords.long || 0}]`,
-            messageType: "location",
-            location: {
-              title: att.title || "ตำแหน่งที่ตั้ง",
-              address: "",
-              latitude: coords.lat || 0,
-              longitude: coords.long || 0,
-            },
-            hasLocation: true,
-          }, platform)
-          console.log(`[Meta/${platform}] ${userName}: [location]`)
-
-        } else if (att.type === "fallback") {
-          // sticker หรือ attachment ที่ Meta ส่งมาแบบ fallback
-          await saveMsg(sourceId, {
-            ...baseMsgFields,
-            content: att.payload?.title || `[${att.type}]`,
-            messageType: att.type,
-            attachmentUrl: attUrl,
-          }, platform)
-          console.log(`[Meta/${platform}] ${userName}: [${att.type}]`)
-        }
-
-        // Analyze ทุก attachment
-        const attContent = `[${att.type}]`
-        analyzeChat(sourceId, userName, attContent, senderId, { type: "user" }).catch(() => {})
-      }
-
-      // handle sticker (Meta ส่ง sticker_id แยก)
-      if (event.message?.sticker_id) {
-        await saveMsg(sourceId, {
-          role: "user",
-          userName,
-          userId: senderId,
-          content: `[sticker:${event.message.sticker_id}]`,
-          messageType: "sticker",
-          sticker: {
-            stickerId: String(event.message.sticker_id),
-            stickerUrl: `https://graph.facebook.com/v19.0/${event.message.sticker_id}/picture`,
-          },
-          hasSticker: true,
-          messageId: event.message?.mid || null,
-          timestamp: event.timestamp || null,
-        }, platform)
-        console.log(`[Meta/${platform}] ${userName}: [sticker]`)
-      }
-    }
-  }
-})
 
 // === LINE Webhook endpoint ===
 app.post("/webhook", express.raw({ type: "*/*" }), async (req, res) => {
@@ -3980,12 +3622,6 @@ app.post("/api/inbox/send", sendLimiter, express.json(), async (req, res) => {
       const result = await sendLineMessage(sourceId, payload);
       sent = result.sent;
       method = result.method;
-    } else if (platform === "facebook" || platform === "instagram") {
-      const recipientId = sourceId.replace(/^(fb_|ig_)/, "");
-      if (text) {
-        sent = await sendMetaMessage(recipientId, text);
-        method = "push";
-      }
     } else {
       return res.status(400).json({ error: `platform '${platform}' not supported` });
     }
@@ -4516,7 +4152,7 @@ app.get("/api/customers/duplicates", async (req, res) => {
     function hasAnyId(val) { return Array.isArray(val) ? val.filter(Boolean).length > 0 : !!val; }
     const singlePlatform = customers.filter(c => {
       const pids = c.platformIds || {};
-      const count = [pids.line, pids.facebook, pids.instagram].filter(v => hasAnyId(v)).length;
+      const count = [pids.line].filter(v => hasAnyId(v)).length;
       return count === 1 && !used.has(c._id.toString());
     });
 

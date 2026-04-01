@@ -42,8 +42,6 @@ export async function PUT(
     if (body.platformIds) {
       const pids = body.platformIds;
       updates.lineId = Array.isArray(pids.line) ? pids.line[0] || "" : pids.line || "";
-      updates.facebookId = Array.isArray(pids.facebook) ? pids.facebook[0] || "" : pids.facebook || "";
-      updates.instagramId = Array.isArray(pids.instagram) ? pids.instagram[0] || "" : pids.instagram || "";
     }
 
     await db.collection("customers").updateOne(

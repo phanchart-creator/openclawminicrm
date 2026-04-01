@@ -86,18 +86,6 @@ const PLATFORM_CONFIG: Record<string, {
     placeholder: "พิมพ์ข้อความ LINE…",
     capabilities: "ข้อความ · รูป · สติกเกอร์ · วิดีโอ · เสียง · ตำแหน่ง · Flex",
   },
-  facebook: {
-    label: "Facebook", icon: "💙", color: "text-blue-400", badgeBg: "bg-blue-600", dot: "bg-blue-400",
-    borderColor: "border-blue-500", headerBg: "bg-blue-950/60", sendBg: "bg-blue-600", sendHover: "hover:bg-blue-500",
-    placeholder: "พิมพ์ข้อความ Messenger…",
-    capabilities: "ข้อความ · รูป (เร็วๆ นี้)",
-  },
-  instagram: {
-    label: "Instagram", icon: "💜", color: "text-pink-400", badgeBg: "bg-gradient-to-r from-purple-600 to-pink-600", dot: "bg-pink-400",
-    borderColor: "border-pink-500", headerBg: "bg-pink-950/40", sendBg: "bg-gradient-to-r from-purple-600 to-pink-600", sendHover: "hover:brightness-110",
-    placeholder: "พิมพ์ข้อความ Instagram DM…",
-    capabilities: "ข้อความ · รูป (เร็วๆ นี้)",
-  },
 };
 
 const MAX_PANELS = 4;
@@ -117,12 +105,10 @@ function timeAgo(dateStr: string | null): string {
 
 function getInitials(name: string): string {
   if (!name) return "?";
-  return name.replace(/^(fb_|ig_)/, "").toUpperCase().substring(0, 2);
+  return name.toUpperCase().substring(0, 2);
 }
 
-function avatarBg(platform: string): string {
-  if (platform === "facebook") return "bg-blue-600";
-  if (platform === "instagram") return "bg-pink-600";
+function avatarBg(_platform: string): string {
   return "bg-green-600";
 }
 
@@ -970,8 +956,6 @@ export default function ChatPage() {
   const platformCounts = {
     all: totalPlatformCounts.all || conversations.length,
     line: totalPlatformCounts.line || 0,
-    facebook: totalPlatformCounts.facebook || 0,
-    instagram: totalPlatformCounts.instagram || 0,
   };
 
   return (
@@ -1001,12 +985,11 @@ export default function ChatPage() {
 
         {/* Platform filter */}
         <div className="px-2 py-1.5 border-b theme-border flex gap-1 flex-wrap">
-          {(["","line","facebook","instagram"] as const).map(p => {
+          {(["","line"] as const).map(p => {
             const isActive = chatPlatform === p;
-            const labels: Record<string, string> = { "": "ทั้งหมด", line: "LINE", facebook: "FB", instagram: "IG" };
+            const labels: Record<string, string> = { "": "ทั้งหมด", line: "LINE" };
             const activeColors: Record<string, string> = {
               "": "bg-white text-black", line: "bg-green-600 text-white",
-              facebook: "bg-blue-600 text-white", instagram: "bg-gradient-to-r from-purple-600 to-pink-600 text-white",
             };
             return (
               <button
@@ -1017,7 +1000,7 @@ export default function ChatPage() {
                 }`}
               >
                 {labels[p]}
-                <span className="text-[9px] px-0.5 rounded-full bg-black/20">{p === "" ? conversations.length : platformCounts[p as "line"|"facebook"|"instagram"]}</span>
+                <span className="text-[9px] px-0.5 rounded-full bg-black/20">{p === "" ? conversations.length : platformCounts.line}</span>
               </button>
             );
           })}
@@ -1036,10 +1019,8 @@ export default function ChatPage() {
             const pcfg = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.line;
             const sentimentLevel = conv.customerSentiment?.level || conv.sentiment?.level;
 
-            // แถบสีซ้ายตาม platform
-            const leftBorderColor = platform === "line" ? "border-l-green-500"
-              : platform === "facebook" ? "border-l-blue-500"
-              : "border-l-pink-500";
+            // แถบสีซ้าย LINE
+            const leftBorderColor = "border-l-green-500";
 
             // ไฮไลท์ถ้าเพิ่งมีข้อความ (<2 นาที)
             const isRecent = conv.lastActivity && (Date.now() - new Date(conv.lastActivity).getTime()) < 120000;
@@ -1049,7 +1030,7 @@ export default function ChatPage() {
                 key={conv.id}
                 onClick={() => openChat(conv.id)}
                 className={`w-full text-left px-2.5 py-2 flex items-start gap-2 transition border-b theme-border border-l-2 hover:theme-bg-hover ${
-                  isOpen ? `${leftBorderColor} bg-opacity-20 ${platform === "line" ? "bg-green-950/40" : platform === "facebook" ? "bg-blue-950/40" : "bg-pink-950/40"}`
+                  isOpen ? `${leftBorderColor} bg-opacity-20 bg-green-950/40`
                     : `${leftBorderColor} border-l-opacity-30`
                 } ${isRecent && !isOpen ? "animate-pulse-subtle" : ""}`}
               >
@@ -1109,16 +1090,6 @@ export default function ChatPage() {
                 <span className="text-2xl">💚</span>
                 <span className="text-lg font-bold text-green-400">{platformCounts.line}</span>
                 <span className="text-[10px] text-green-400/70">LINE</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl bg-blue-950/30 border border-blue-800/30">
-                <span className="text-2xl">💙</span>
-                <span className="text-lg font-bold text-blue-400">{platformCounts.facebook}</span>
-                <span className="text-[10px] text-blue-400/70">Facebook</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 px-4 py-3 rounded-xl bg-pink-950/30 border border-pink-800/30">
-                <span className="text-2xl">💜</span>
-                <span className="text-lg font-bold text-pink-400">{platformCounts.instagram}</span>
-                <span className="text-[10px] text-pink-400/70">Instagram</span>
               </div>
             </div>
 

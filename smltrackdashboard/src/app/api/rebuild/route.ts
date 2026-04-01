@@ -61,8 +61,6 @@ export async function POST() {
           { sourceId: sid },
           { rooms: sid },
           { "platformIds.line": sid },
-          { "platformIds.facebook": sid },
-          { "platformIds.instagram": sid },
         ],
       });
       if (existing) continue;
@@ -75,10 +73,8 @@ export async function POST() {
       const platform = lastMsg?.platform || "line";
 
       // สร้าง platformIds เป็น object with arrays (รองรับหลาย ID ต่อ platform)
-      const platformIds: Record<string, string[]> = { line: [], facebook: [], instagram: [] };
+      const platformIds: Record<string, string[]> = { line: [] };
       if (platform === "line") platformIds.line = [sid];
-      else if (platform === "facebook") platformIds.facebook = [sid];
-      else if (platform === "instagram") platformIds.instagram = [sid];
 
       await db.collection("customers").insertOne({
         name: customerName,
